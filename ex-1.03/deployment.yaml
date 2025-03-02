@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: random-string-generator
+  labels:
+    app: random-string-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: random-string-generator
+  template:
+    metadata:
+      labels:
+        app: random-string-generator
+    spec:
+      containers:
+        - name: random-string-generator
+          image: hovhanneshovakimyan/random-string-generator:1.01
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: random-string-generator-service
+  labels:
+    app: random-string-generator
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: random-string-generator
