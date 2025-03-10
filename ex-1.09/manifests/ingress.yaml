@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: random-string-app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - host: localhost
+      http:
+        paths:
+          - path: /status
+            pathType: Prefix
+            backend:
+              service:
+                name: random-string-app-service
+                port:
+                  number: 80
+          - path: /ping
+            pathType: Prefix
+            backend:
+              service:
+                name: ping-pong-app-service
+                port:
+                  number: 80

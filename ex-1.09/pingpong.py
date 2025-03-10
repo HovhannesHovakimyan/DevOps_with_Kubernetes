@@ -1,0 +1,17 @@
+from flask import Flask
+
+app = Flask(__name__)
+
+# Initialize a counter in memory
+request_counter = 0
+
+
+@app.route("/ping", methods=["GET"])
+def ping():
+    global request_counter
+    request_counter += 1
+    return f"pong {request_counter}"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5001)

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: random-string-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: random-string-app
+  template:
+    metadata:
+      labels:
+        app: random-string-app
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: random-string-app
+          image: hovhanneshovakimyan/random-string-generator:1.09
+          ports:
+            - containerPort: 5000
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: random-string-app-service
+spec:
+  selector:
+    app: random-string-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: ClusterIP
