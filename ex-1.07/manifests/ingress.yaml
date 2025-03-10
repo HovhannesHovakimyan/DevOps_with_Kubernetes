@@ -1,15 +1,18 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: dwk-material-ingress
+  name: random-string-app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-    - http:
+    - host: localhost
+      http:
         paths:
-          - path: /
+          - path: /status
             pathType: Prefix
             backend:
               service:
-                name: hashresponse-svc
+                name: random-string-app-service
                 port:
-                  number: 2345
+                  number: 80

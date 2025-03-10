@@ -1,11 +1,23 @@
-# Use an official Python runtime as the base image
+# Use a slim base image for a smaller footprint
 FROM python:3.9-slim
 
-# Set the working directory in the container
+# Set a non-root user
+RUN addgroup --system appgroup && adduser --system --group --uid 1000 appuser
+
+# Set work directory and permissions
 WORKDIR /app
 
-# Copy the Python script into the container
-COPY random_string_generator.py .
+# Copy and install dependencies first (optimizing layer caching)
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Run the Python script when the container starts
-ENTRYPOINT ["python", "random_string_generator.py"]
+# Copy application files
+COPY app.py /app/
+
+# Change ownership and switch to non-root user
+RUN chown -R appuser:appgroup /app
+USER appuser
+
+# Expose port and run the application
+EXPOSE 5000
+CMD ["python", "app.py"]

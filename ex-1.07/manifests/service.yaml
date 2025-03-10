@@ -1,13 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: random-string-generator-service
-  labels:
-    app: random-string-generator
+  name: random-string-app-service
 spec:
-  type: ClusterIP
-  ports:
-    - port: 80
-      targetPort: 80
   selector:
-    app: random-string-generator
+    app: random-string-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: ClusterIP

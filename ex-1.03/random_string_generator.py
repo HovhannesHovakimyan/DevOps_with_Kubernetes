@@ -1,16 +1,23 @@
+from flask import Flask, jsonify
 import uuid
-import time
 from datetime import datetime
 
-def generate_random_string():
-    return str(uuid.uuid4())
+app = Flask(__name__)
 
-def main():
-    random_string = generate_random_string()
-    while True:
-        timestamp = datetime.utcnow().isoformat() + 'Z'
-        print(f"{timestamp}: {random_string}", flush=True)  # Add flush=True
-        time.sleep(5)
+# Generate random string and timestamp at startup
+random_string = str(uuid.uuid4())
+timestamp = datetime.utcnow().isoformat() + "Z"
+
+
+@app.route("/status", methods=["GET"])
+def get_status():
+    return jsonify({"timestamp": timestamp, "random_string": random_string})
+
+
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    return jsonify({"status": "ok"}), 200
+
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=5000)

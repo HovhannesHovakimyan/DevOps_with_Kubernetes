@@ -1,27 +1,30 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: random-string-generator
-  labels:
-    app: random-string-generator
+  name: random-string-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: random-string-generator
+      app: random-string-app
   template:
     metadata:
       labels:
-        app: random-string-generator
+        app: random-string-app
     spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
-        - name: random-string-generator
-          image: hovhanneshovakimyan/random-string-generator:1.01
-          imagePullPolicy: IfNotPresent
+        - name: random-string-app
+          image: hovhanneshovakimyan/random-string-generator:1.07
+          ports:
+            - containerPort: 5000
           resources:
-            requests:
-              memory: "64Mi"
-              cpu: "100m"
             limits:
+              cpu: "500m"
+              memory: "256Mi"
+            requests:
+              cpu: "250m"
               memory: "128Mi"
-              cpu: "200m"
