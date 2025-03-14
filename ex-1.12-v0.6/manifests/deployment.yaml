@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-image-server
+  labels:
+    app: node-image-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node-image-server
+  template:
+    metadata:
+      labels:
+        app: node-image-server
+    spec:
+      containers:
+        - name: node-image-server
+          image: hovhanneshovakimyan/k8sproject:ex-1.12-v0.6
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: cache-volume
+              mountPath: /app/cache
+      volumes:
+        - name: cache-volume
+          persistentVolumeClaim:
+            claimName: cache-pvc
