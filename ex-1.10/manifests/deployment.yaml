@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: timestamp-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: timestamp-app
+  template:
+    metadata:
+      labels:
+        app: timestamp-app
+    spec:
+      containers:
+        - name: writer
+          image: hovhanneshovakimyan/timestamp-writer:1.10
+          volumeMounts:
+            - name: shared-data
+              mountPath: /shared-data
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+            requests:
+              cpu: "250m"
+              memory: "64Mi"
+        - name: reader
+          image: hovhanneshovakimyan/timestamp-reader:1.10
+          volumeMounts:
+            - name: shared-data
+              mountPath: /shared-data
+          ports:
+            - containerPort: 5000
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+            requests:
+              cpu: "250m"
+              memory: "64Mi"
+      volumes:
+        - name: shared-data
+          emptyDir: {}
