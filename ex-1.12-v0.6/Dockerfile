@@ -4,6 +4,10 @@ FROM node:18-alpine
 # Set the working directory in the container
 WORKDIR /app
 
+# Define an entrypoint script to handle graceful shutdown
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Copy the package.json and package-lock.json files
 COPY package*.json ./
 
@@ -19,5 +23,5 @@ EXPOSE 3000
 # Define environment variable
 ENV PORT=3000
 
-# Run the application
-ENTRYPOINT ["node", "server.js"]
+# Set the entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
