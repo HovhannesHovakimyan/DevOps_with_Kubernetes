@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: node-image-server
-          image: hovhanneshovakimyan/k8sproject:ex-1.12-v0.6
+          image: hovhanneshovakimyan/k8sproject:ex-1.13-v0.7
           ports:
             - containerPort: 3000
           env:
