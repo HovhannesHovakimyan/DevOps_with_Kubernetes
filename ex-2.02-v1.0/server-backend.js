@@ -1,47 +1,32 @@
-// todo-backend.js
-import http from 'http';
+import express from 'express';
 
-// In-memory storage for todos
+const app = express();
+const PORT = 3001;
+
+// In-memory storage for TODOs
 let todos = [
-    'Finish the project',
-    'Buy groceries',
-    'Call the plumber',
-    'Read a book',
+    { id: 1, task: 'Learn Kubernetes' },
+    { id: 2, task: 'Set up k3d cluster' },
+    { id: 3, task: 'Build TODO app' }
 ];
 
-// Create the HTTP server
-const server = http.createServer(async (req, res) => {
-    if (req.method === 'GET' && req.url === '/todos') {
-        // Handle GET /todos request
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(todos));
-    } else if (req.method === 'POST' && req.url === '/todos') {
-        // Handle POST /todos request
-        let body = '';
-        req.on('data', chunk => {
-            body += chunk.toString();
-        });
-        req.on('end', () => {
-            const todo = JSON.parse(body);
-            if (!todo || !todo.title) {
-                res.statusCode = 400;
-                res.end(JSON.stringify({ error: 'Title is required' }));
-                return;
-            }
-            todos.push(todo.title);
-            res.statusCode = 201;
-            res.end(JSON.stringify(todo));
-        });
-    } else {
-        res.statusCode = 404;
-        res.setHeader('Content-Type', 'text/plain');
-        res.end('404 Not Found\n');
-    }
+app.use(express.json());
+
+// GET endpoint for todo list
+app.get('/todos', (req, res) => {
+    res.json(todos);
 });
 
-// Start the server
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-    console.log(`Todo backend server started on port ${PORT}`);
+// POST endpoint to create new todo
+app.post('/todos', (req, res) => {
+    const newTodo = {
+        id: todos.length + 1,
+        task: req.body.task
+    };
+    todos.push(newTodo);
+    res.status(201).json(newTodo);
+});
+
+app.listen(PORT, () => {
+    console.log(`Backend server running on port ${PORT}`);
 });

@@ -20,8 +20,9 @@ COPY server-frontend.js ./server.js
 # Make port 3000 available to the world outside this container
 EXPOSE 3000
 
-# Define environment variable
+# Define environment variables
 ENV PORT=3000
+ENV BACKEND_URL=todo-backend:3001
 
 # Set the entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]

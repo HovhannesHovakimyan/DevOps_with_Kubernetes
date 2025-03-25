@@ -17,6 +17,7 @@ spec:
       containers:
         - name: todo-backend
           image: hovhanneshovakimyan/k8sproject:ex-2.02-v1.0-backend
+          imagePullPolicy: Always
           ports:
             - containerPort: 3001
           env:
@@ -48,6 +49,6 @@ spec:
     app: todo-backend
   ports:
     - protocol: TCP
-      port: 80
+      port: 3001
       targetPort: 3001
   type: ClusterIP

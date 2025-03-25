@@ -15,11 +15,11 @@ spec:
               service:
                 name: todo-frontend
                 port:
-                  number: 80
+                  number: 3000
           - path: /todos
             pathType: Prefix
             backend:
               service:
                 name: todo-backend
                 port:
-                  number: 80
+                  number: 3001
