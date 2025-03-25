@@ -1,13 +1,5 @@
 {
-  "name": "node-image-server",
-  "version": "1.0.0",
-  "description": "A Node.js server that serves a random image every hour.",
-  "main": "server.js",
-  "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
   "dependencies": {
-    "node-fetch": "^3.3.0"
+    "node-fetch": "^3.3.2"
   }
 }

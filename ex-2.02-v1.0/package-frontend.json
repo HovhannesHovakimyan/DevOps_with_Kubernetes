@@ -1,0 +1,14 @@
+{
+  "name": "todo-frontend",
+  "version": "1.0.0",
+  "description": "A Node.js server that serves HTML and random images.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.0"
+  },
+  "type": "module"
+}
