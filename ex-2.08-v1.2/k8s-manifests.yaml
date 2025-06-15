@@ -48,7 +48,7 @@ spec:
     spec:
       containers:
         - name: todo-backend
-          image: hovhanneshovakimyan/k8sproject:ex-2.04-v1.1-test-backend # Updated image name
+          image: hovhanneshovakimyan/k8sproject:ex-2.08-v1.2-backend # Updated image name
           ports:
             - containerPort: 3001
 ---
@@ -69,7 +69,7 @@ spec:
     spec:
       containers:
         - name: todo-frontend
-          image: hovhanneshovakimyan/k8sproject:ex-2.04-v1.1-test-frontend # Updated image name
+          image: hovhanneshovakimyan/k8sproject:ex-2.08-v1.2-frontend # Updated image name
           ports:
             - containerPort: 3000
           volumeMounts:

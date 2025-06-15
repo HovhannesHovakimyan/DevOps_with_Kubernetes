@@ -2,10 +2,11 @@
 
 # Get the name of the containing folder (parent directory of the script)
 CONTAINING_FOLDER=$(basename "$(pwd)")
+DOCKER_HUB_USERNAME="hovhanneshovakimyan"
 
 # Define image names using the containing folder name
-BACKEND_IMAGE="hovhanneshovakimyan/k8sproject:${CONTAINING_FOLDER}-backend"
-FRONTEND_IMAGE="hovhanneshovakimyan/k8sproject:${CONTAINING_FOLDER}-frontend"
+BACKEND_IMAGE="${DOCKER_HUB_USERNAME}/k8sproject:${CONTAINING_FOLDER}-backend"
+FRONTEND_IMAGE="${DOCKER_HUB_USERNAME}/k8sproject:${CONTAINING_FOLDER}-frontend"
 
 # Build the backend Docker image
 echo "Building backend image: $BACKEND_IMAGE"
