@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>TODO List</title>
+  <style>
+    .todo-list {
+      max-width: 600px;
+      margin: 20px auto;
+    }
+
+    .todo-item {
+      margin: 10px 0;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="todo-list">
+    <img src="/image" alt="Random Image">
+    <form id="todo-form">
+      <input type="text" id="todo-input" placeholder="Add a new TODO">
+      <button type="submit">Add</button>
+    </form>
+    <div id="todos"></div>
+  </div>
+
+  <script>
+    async function getBackendUrl() {
+      const response = await fetch('/config');
+      const config = await response.json();
+      return config.backendUrl;
+    }
+
+    async function loadTodos(backendUrl) {
+      const response = await fetch(backendUrl);
+      const todos = await response.json();
+      const todosDiv = document.getElementById('todos');
+      todosDiv.innerHTML = todos.map(todo => `
+        <div class="todo-item">${todo.text}</div>
+      `).join('');
+    }
+
+    (async () => {
+      const backendUrl = await getBackendUrl();
+
+      async function init() {
+        await loadTodos(backendUrl);
+      }
+
+      document.getElementById('todo-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('todo-input');
+        const text = input.value.trim();
+        if (text) {
+          await fetch(backendUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+          });
+          input.value = '';
+          loadTodos(backendUrl);
+        }
+      });
+
+      init();
+    })();
+  </script>
+</body>
+
+</html>
