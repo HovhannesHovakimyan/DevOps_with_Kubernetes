@@ -17,26 +17,14 @@ spec:
       containers:
         - name: postgres
           image: postgres:13-alpine
-          env:
-            - name: POSTGRES_DB
-              value: "pingpong"
-            - name: POSTGRES_USER
-              value: "postgres"
-            - name: POSTGRES_PASSWORD
-              value: "postgres"
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+            - configMapRef:
+                name: postgres-config
           ports:
             - containerPort: 5432
               name: postgres
-          readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - "pg_isready -U postgres -d pingpong"
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 2
-            failureThreshold: 10
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

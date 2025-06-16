@@ -25,12 +25,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres-service
+  name: postgres
   namespace: devops
 spec:
-  selector:
-    app: postgres
+  clusterIP: None
   ports:
     - port: 5432
-      targetPort: postgres
-  clusterIP: None
+      name: postgres
+  selector:
+    app: postgres
