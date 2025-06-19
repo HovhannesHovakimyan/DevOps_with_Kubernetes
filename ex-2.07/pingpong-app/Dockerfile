@@ -13,9 +13,9 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copy and install dependencies first (optimizing layer caching)
-COPY requirements_ping.txt /app/
+COPY requirements.txt /app/
 RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements_ping.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY pingpong.py /app/

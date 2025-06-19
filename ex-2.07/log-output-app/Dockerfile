@@ -8,8 +8,8 @@ RUN addgroup --system appgroup && adduser --system --group --uid 1000 appuser
 WORKDIR /app
 
 # Copy and install dependencies first (optimizing layer caching)
-COPY requirements_status.txt /app/
-RUN pip install --no-cache-dir -r requirements_status.txt
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY log_output.py /app/
