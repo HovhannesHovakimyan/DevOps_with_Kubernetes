@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wikipedia-todo-generator
+spec:
+  schedule: "0 * * * *" # Runs at the start of every hour
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: todo-generator
+              image: curlimages/curl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  # Get random Wikipedia URL
+                  URL=$(curl -s -I "https://en.wikipedia.org/wiki/Special:Random" | grep -i "^location:" | awk '{print $2}' | tr -d '\r')
+
+                  # Create todo item (in this case, just printing to logs - in a real system you'd add to your todo system)
+                  echo "TODO: Read $URL"
+
+                  # In a real implementation, you might:
+                  # 1. Add to a todo.txt file
+                  # 2. Call a todo API
+                  # 3. Send a notification
+          restartPolicy: OnFailure
