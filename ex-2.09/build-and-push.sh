@@ -30,8 +30,11 @@ cd .. || { echo "Failed to return to root directory"; exit 1; }
 echo "Pushing images to DockerHub..."
 cd "$PINGPONG_DIR" || { echo "Failed to enter $PINGPONG_DIR directory"; exit 1; }
 docker push "$PINGPONG_APP" || { echo "Failed to push ping pong image"; exit 1; }
+cd .. || { echo "Failed to return to root directory"; exit 1; }
+
 cd "$LOG_OUTPUT_DIR" || { echo "Failed to enter $LOG_OUTPUT_DIR directory"; exit 1; }
 docker push "$LOG_OUTPUT_APP" || { echo "Failed to push log output image"; exit 1; }
+cd .. || { echo "Failed to return to root directory"; exit 1; }
 
 echo "Successfully built and pushed images:"
 echo "- $PINGPONG_APP"
