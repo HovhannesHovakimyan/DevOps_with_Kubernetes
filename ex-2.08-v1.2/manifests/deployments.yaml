@@ -45,7 +45,7 @@ spec:
                   name: postgres-secret
                   key: POSTGRES_DB
             - name: DB_HOST
-              value: "postgres"
+              value: "postgres.devops.svc.cluster.local"
             - name: DB_PORT
               value: "5432"
 ---

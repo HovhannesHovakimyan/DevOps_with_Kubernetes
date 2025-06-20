@@ -6,6 +6,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`, {
+    body: req.body,
+    params: req.params,
+    query: req.query
+  });
+  next();
+});
+
 // Database connection configuration
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -81,14 +91,26 @@ app.get('/todos', async (req, res) => {
 app.post('/todos', async (req, res) => {
   try {
     const { text } = req.body;
+
     if (!text) {
+      console.log('Todo creation rejected: Text is required');
       return res.status(400).json({ error: 'Text is required' });
+    }
+
+    if (text.length > 140) {
+      console.log(`Todo creation rejected: Text exceeds 140 characters (length: ${text.length})`);
+      return res.status(400).json({
+        error: 'Todo text must be 140 characters or less',
+        length: text.length
+      });
     }
 
     const result = await pool.query(
       'INSERT INTO todos (text) VALUES ($1) RETURNING *',
       [text]
     );
+
+    console.log(`Todo created successfully: ID ${result.rows[0].id}`);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Error creating todo:', err);
