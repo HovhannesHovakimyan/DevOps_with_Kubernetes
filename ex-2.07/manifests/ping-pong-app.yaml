@@ -15,16 +15,16 @@ spec:
     spec:
       containers:
         - name: ping-pong
-          image: hovhanneshovakimyan/ping-pong:2.07
+          image: hovhanneshovakimyan/ping-pong:2.07-multiarch
           imagePullPolicy: Always
           ports:
             - containerPort: 5001
           resources:
             requests:
-              memory: "64Mi"
-              cpu: "250m"
-            limits:
               memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
               cpu: "500m"
 ---
 apiVersion: v1
