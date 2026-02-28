@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: log-output
-          image: hovhanneshovakimyan/random-string-generator:3.3-multiarch
+          image: hovhanneshovakimyan/random-string-generator:3.4-multiarch
           imagePullPolicy: Always
           env:
             - name: MESSAGE

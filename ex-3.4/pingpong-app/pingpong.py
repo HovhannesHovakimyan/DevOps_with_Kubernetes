@@ -88,7 +88,7 @@ except Exception as e:
     sys.exit(1)
 
 
-@app.route("/pingpong", methods=["GET"])
+@app.route("/", methods=["GET"])
 def ping():
     try:
         with get_db_connection() as conn:
@@ -105,7 +105,7 @@ def ping():
                 conn.commit()
                 return f"pong {count}"
     except Exception as e:
-        log_error(f"/pingpong failed: {str(e)}")
+        log_error(f"/ failed: {str(e)}")
         return "Database error", 500
 
 
@@ -120,11 +120,6 @@ def get_pongs():
     except Exception as e:
         log_error(f"/pongs failed: {str(e)}")
         return "Database error", 500
-
-
-@app.route("/", methods=["GET"])
-def root():
-    return "OK", 200
 
 
 if __name__ == "__main__":
