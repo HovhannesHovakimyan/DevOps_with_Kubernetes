@@ -1,0 +1,13 @@
+{
+  "name": "todo-frontend",
+  "version": "1.0.0",
+  "description": "TODO app frontend",
+  "main": "todo-frontend.js",
+  "scripts": {
+    "start": "node todo-frontend.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "axios": "^0.21.1"
+  }
+}

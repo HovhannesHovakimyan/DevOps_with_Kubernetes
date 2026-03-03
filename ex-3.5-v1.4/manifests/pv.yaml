@@ -1,0 +1,16 @@
+# GKE does not require a static PV for dynamic provisioning. Remove this file or comment it out.
+# If you want a static PV, use gcePersistentDisk as below:
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: todo-frontend-cache-pv
+# spec:
+#   capacity:
+#     storage: 1Gi
+#   accessModes:
+#     - ReadWriteOnce
+#   persistentVolumeReclaimPolicy: Retain
+#   storageClassName: standard
+#   gcePersistentDisk:
+#     pdName: <your-precreated-disk>
+#     fsType: ext4
