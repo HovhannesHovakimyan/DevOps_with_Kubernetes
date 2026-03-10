@@ -24,6 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Debug GKE_SA_KEY length
+        shell: bash
+        run: |
+          echo "Length of GKE_SA_KEY: $(echo '${{ secrets.GKE_SA_KEY }}' | wc -c)"
+
       - uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.GKE_SA_KEY }}
