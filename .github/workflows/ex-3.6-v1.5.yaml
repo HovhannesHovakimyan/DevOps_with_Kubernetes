@@ -148,7 +148,7 @@ jobs:
           docker push "$image_tag"
 
   deploy:
-    name: Deploy (${{ matrix.component }})
+    name: Deploy application
     runs-on: ubuntu-latest
     environment: sirit
     env:
@@ -156,9 +156,6 @@ jobs:
     needs:
       - build-and-push
       - detect-context
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.detect-context.outputs.component_matrix) }}
 
     steps:
       - name: Checkout
@@ -195,19 +192,29 @@ jobs:
       - name: Set up Kustomize
         uses: imranismail/setup-kustomize@v2.1.0
 
-      - name: Deploy ${{ matrix.component }}
+      - name: Deploy backend and frontend
         working-directory: ./${{ needs.detect-context.outputs.app_folder }}
         shell: bash
         run: |-
           set -euo pipefail
-          image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-${{ matrix.component }}:${{ needs.detect-context.outputs.app_folder }}"
+          app_folder="${{ needs.detect-context.outputs.app_folder }}"
+          backend_image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-backend:${app_folder}"
+          frontend_image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-frontend:${app_folder}"
 
-          if [[ "$image_tag" == *"//"* ]]; then
-            echo "Generated image tag contains a double slash: $image_tag"
+          if [[ "$backend_image_tag" == *"//"* || "$frontend_image_tag" == *"//"* ]]; then
+            echo "Generated image tag contains a double slash."
+            echo "Backend tag: $backend_image_tag"
+            echo "Frontend tag: $frontend_image_tag"
             exit 1
           fi
 
-          kustomize edit set image "${{ matrix.kustomize_image_key }}=$image_tag"
+          # Fail fast if either image was not pushed successfully.
+          gcloud artifacts docker images describe "$backend_image_tag"
+          gcloud artifacts docker images describe "$frontend_image_tag"
+
+          kustomize edit set image "BACKEND_IMAGE=$backend_image_tag"
+          kustomize edit set image "FRONTEND_IMAGE=$frontend_image_tag"
           kustomize build . | kubectl apply -f -
-          kubectl rollout status deployment todo-${{ matrix.component }} -n devops
+          kubectl rollout status deployment todo-backend -n devops
+          kubectl rollout status deployment todo-frontend -n devops
           kubectl get services -n devops -o wide

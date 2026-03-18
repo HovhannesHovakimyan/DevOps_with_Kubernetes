@@ -12,7 +12,7 @@ resources:
 images:
   - name: BACKEND_IMAGE
     newName: hovhanneshovakimyan/k8sproject
-    newTag: ex-3.5-v1.5-backend-multiarch
+    newTag: ex-3.6-v1.5-backend-multiarch
   - name: FRONTEND_IMAGE
     newName: hovhanneshovakimyan/k8sproject
-    newTag: ex-3.5-v1.5-frontend-multiarch
+    newTag: ex-3.6-v1.5-frontend-multiarch
