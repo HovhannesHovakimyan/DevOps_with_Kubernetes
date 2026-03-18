@@ -5,6 +5,12 @@ on:
     paths:
       - "ex-3.6-v1.5/**"
       - ".github/workflows/ex-3.6-v1.5.yaml"
+  workflow_dispatch:
+    inputs:
+      teardown:
+        description: "Delete all deployed resources (type 'yes' to confirm)"
+        required: true
+        default: "no"
 
 env:
   GKE_CLUSTER: dwk-cluster
@@ -218,3 +224,40 @@ jobs:
           kubectl rollout status deployment todo-backend -n devops
           kubectl rollout status deployment todo-frontend -n devops
           kubectl get services -n devops -o wide
+
+  teardown:
+    name: Teardown application
+    runs-on: ubuntu-latest
+    environment: sirit
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.teardown == 'yes'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v3
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          project_id: ${{ env.PROJECT_ID }}
+          location: ${{ env.GKE_ZONE }}
+
+      - name: Set up Kustomize
+        uses: imranismail/setup-kustomize@v2.1.0
+
+      - name: Delete all resources
+        working-directory: ./ex-3.6-v1.5
+        shell: bash
+        run: |-
+          set -euo pipefail
+          kustomize build . | kubectl delete --ignore-not-found=true -f -
+          echo "All resources deleted."
