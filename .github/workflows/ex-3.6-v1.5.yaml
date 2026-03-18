@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       app_folder: ${{ steps.detect.outputs.app_folder }}
+      component_matrix: ${{ steps.detect.outputs.component_matrix }}
 
     steps:
       - name: Checkout
@@ -38,7 +39,30 @@ jobs:
             echo "Ensure this workflow is triggered by changes under an ex-* directory."
             exit 1
           fi
+
+          component_matrix="$(jq -cn \
+            --arg registry "$REGISTRY" \
+            --arg project_id "$PROJECT_ID" \
+            --arg repository "$REPOSITORY" \
+            --arg image_base "$IMAGE_BASE" \
+            --arg app_folder "$app_folder" \
+            '{include: [
+              {
+                component: "backend",
+                image_name: ($image_base + "-backend"),
+                image_tag: ($registry + "/" + $project_id + "/" + $repository + "/" + $image_base + "-backend:" + $app_folder),
+                kustomize_image_key: "BACKEND_IMAGE"
+              },
+              {
+                component: "frontend",
+                image_name: ($image_base + "-frontend"),
+                image_tag: ($registry + "/" + $project_id + "/" + $repository + "/" + $image_base + "-frontend:" + $app_folder),
+                kustomize_image_key: "FRONTEND_IMAGE"
+              }
+            ]}')"
+
           echo "app_folder=$app_folder" >> "$GITHUB_OUTPUT"
+          echo "component_matrix=$component_matrix" >> "$GITHUB_OUTPUT"
 
   build-and-push:
     name: Build and Push (${{ matrix.component }})
@@ -47,12 +71,7 @@ jobs:
     needs: detect-context
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - component: backend
-            image_name: k8sproject-backend
-          - component: frontend
-            image_name: k8sproject-frontend
+      matrix: ${{ fromJson(needs.detect-context.outputs.component_matrix) }}
 
     steps:
       - name: Checkout
@@ -91,7 +110,7 @@ jobs:
         run: |
           set -euo pipefail
           app_folder="${{ needs.detect-context.outputs.app_folder }}"
-          image_tag="$REGISTRY/$PROJECT_ID/$REPOSITORY/${{ matrix.image_name }}:$app_folder"
+          image_tag='${{ matrix.image_tag }}'
           docker build --tag "$image_tag" "./$app_folder/${{ matrix.component }}"
           docker push "$image_tag"
 
@@ -104,12 +123,7 @@ jobs:
       - detect-context
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - component: backend
-            image_name: k8sproject-backend
-          - component: frontend
-            image_name: k8sproject-frontend
+      matrix: ${{ fromJson(needs.detect-context.outputs.component_matrix) }}
 
     steps:
       - name: Checkout
@@ -151,10 +165,8 @@ jobs:
         shell: bash
         run: |-
           set -euo pipefail
-          app_folder="${{ needs.detect-context.outputs.app_folder }}"
-          component="${{ matrix.component }}"
-          image_tag="$REGISTRY/$PROJECT_ID/$REPOSITORY/${{ matrix.image_name }}:$app_folder"
-          kustomize edit set image "${component^^}_IMAGE=$image_tag"
+          image_tag='${{ matrix.image_tag }}'
+          kustomize edit set image "${{ matrix.kustomize_image_key }}=$image_tag"
           kustomize build . | kubectl apply -f -
-          kubectl rollout status deployment todo-$component -n devops
+          kubectl rollout status deployment todo-${{ matrix.component }} -n devops
           kubectl get services -n devops -o wide
