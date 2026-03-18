@@ -13,6 +13,7 @@ env:
   REGISTRY: me-west1-docker.pkg.dev
   REPOSITORY: my-repository
   IMAGE_BASE: k8sproject
+  WORKFLOW_FILE: .github/workflows/ex-3.6-v1.5.yaml
 
 jobs:
   detect-context:
@@ -35,9 +36,13 @@ jobs:
           set -euo pipefail
           app_folder="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | awk -F/ '/^ex-[^/]+\// {print $1; exit}')"
           if [[ -z "$app_folder" ]]; then
-            echo "No changed ex-* folder detected from push diff."
-            echo "Ensure this workflow is triggered by changes under an ex-* directory."
-            exit 1
+            if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -Fxq "$WORKFLOW_FILE"; then
+              app_folder="$(basename "$WORKFLOW_FILE" .yaml)"
+            else
+              echo "No changed ex-* folder detected from push diff."
+              echo "Ensure this workflow is triggered by changes under an ex-* directory or by updating $WORKFLOW_FILE."
+              exit 1
+            fi
           fi
 
           component_matrix="$(jq -cn \
