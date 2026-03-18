@@ -31,7 +31,7 @@ spec:
               memory: "32Mi"
       containers:
         - name: todo-backend
-          image: hovhanneshovakimyan/k8sproject:ex-3.5-v1.4-backend-multiarch
+          image: BACKEND_IMAGE
           imagePullPolicy: Always
           ports:
             - containerPort: 3001
@@ -80,7 +80,7 @@ spec:
     spec:
       containers:
         - name: todo-frontend
-          image: hovhanneshovakimyan/k8sproject:ex-3.5-v1.4-frontend-multiarch
+          image: FRONTEND_IMAGE
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

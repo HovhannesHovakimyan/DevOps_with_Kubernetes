@@ -10,5 +10,9 @@ resources:
   - manifests/services.yaml
   - manifests/statefulSets.yaml
 images:
-  - name: gcr.io/PROJECT_ID/IMAGE
-    newName: jakousa/dwk-app6:e11a700350aede132b62d3b5fd63c05d6b976394
+  - name: BACKEND_IMAGE
+    newName: hovhanneshovakimyan/k8sproject
+    newTag: ex-3.5-v1.5-backend-multiarch
+  - name: FRONTEND_IMAGE
+    newName: hovhanneshovakimyan/k8sproject
+    newTag: ex-3.5-v1.5-frontend-multiarch
