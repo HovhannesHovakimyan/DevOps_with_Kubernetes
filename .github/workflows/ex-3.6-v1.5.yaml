@@ -11,22 +11,47 @@ env:
   GKE_ZONE: me-west1
   REGISTRY: me-west1-docker.pkg.dev
   REPOSITORY: my-repository
-  IMAGE: dwk-environments
-  BRANCH: ${{ github.ref_name }}
+  IMAGE_BASE: k8sproject
 
 jobs:
+  detect-context:
+    name: Detect Build Context
+    runs-on: ubuntu-latest
+    outputs:
+      app_folder: ${{ steps.detect.outputs.app_folder }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect app folder from changed files
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_folder="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | awk -F/ '/^ex-[^/]+\// {print $1; exit}')"
+          if [[ -z "$app_folder" ]]; then
+            echo "No changed ex-* folder detected from push diff."
+            echo "Ensure this workflow is triggered by changes under an ex-* directory."
+            exit 1
+          fi
+          echo "app_folder=$app_folder" >> "$GITHUB_OUTPUT"
+
   build-and-push:
     name: Build and Push (${{ matrix.component }})
     runs-on: ubuntu-latest
     environment: sirit
+    needs: detect-context
     strategy:
       fail-fast: false
       matrix:
         include:
           - component: backend
-            component_upper: BACKEND
+            image_name: k8sproject-backend
           - component: frontend
-            component_upper: FRONTEND
+            image_name: k8sproject-frontend
 
     steps:
       - name: Checkout
@@ -64,15 +89,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image_tag="$REGISTRY/$PROJECT_ID/$REPOSITORY/$IMAGE:$BRANCH-${{ matrix.component_upper }}-$GITHUB_SHA"
-          docker build --tag "$image_tag" "./ex-3.6-v1.5/${{ matrix.component }}"
+          app_folder="${{ needs.detect-context.outputs.app_folder }}"
+          image_tag="$REGISTRY/$PROJECT_ID/$REPOSITORY/${{ matrix.image_name }}:$app_folder"
+          docker build --tag "$image_tag" "./$app_folder/${{ matrix.component }}"
           docker push "$image_tag"
 
   deploy:
-    name: Deploy
+    name: Deploy (${{ matrix.component }})
     runs-on: ubuntu-latest
     environment: sirit
-    needs: build-and-push
+    needs:
+      - build-and-push
+      - detect-context
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: backend
+            image_name: k8sproject-backend
+          - component: frontend
+            image_name: k8sproject-frontend
 
     steps:
       - name: Checkout
@@ -109,17 +145,15 @@ jobs:
       - name: Set up Kustomize
         uses: imranismail/setup-kustomize@v2.1.0
 
-      - name: Deploy Backend and Frontend
-        working-directory: ./ex-3.6-v1.5
+      - name: Deploy ${{ matrix.component }}
+        working-directory: ./${{ needs.detect-context.outputs.app_folder }}
         shell: bash
         run: |-
           set -euo pipefail
-          backend_tag="$REGISTRY/$PROJECT_ID/$REPOSITORY/$IMAGE:$BRANCH-BACKEND-$GITHUB_SHA"
-          frontend_tag="$REGISTRY/$PROJECT_ID/$REPOSITORY/$IMAGE:$BRANCH-FRONTEND-$GITHUB_SHA"
-          kustomize edit set image \
-            BACKEND_IMAGE=$backend_tag \
-            FRONTEND_IMAGE=$frontend_tag
+          app_folder="${{ needs.detect-context.outputs.app_folder }}"
+          component="${{ matrix.component }}"
+          image_tag="$REGISTRY/$PROJECT_ID/$REPOSITORY/${{ matrix.image_name }}:$app_folder"
+          kustomize edit set image "${component^^}_IMAGE=$image_tag"
           kustomize build . | kubectl apply -f -
-          kubectl rollout status deployment todo-backend -n devops
-          kubectl rollout status deployment todo-frontend -n devops
+          kubectl rollout status deployment todo-$component -n devops
           kubectl get services -n devops -o wide
