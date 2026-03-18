@@ -7,7 +7,6 @@ on:
       - ".github/workflows/ex-3.6-v1.5.yaml"
 
 env:
-  PROJECT_ID: ${{ secrets.GKE_PROJECT }}
   GKE_CLUSTER: dwk-cluster
   GKE_ZONE: me-west1
   REGISTRY: me-west1-docker.pkg.dev
@@ -19,6 +18,9 @@ jobs:
   detect-context:
     name: Detect Build Context
     runs-on: ubuntu-latest
+    environment: sirit
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
     outputs:
       app_folder: ${{ steps.detect.outputs.app_folder }}
       component_matrix: ${{ steps.detect.outputs.component_matrix }}
@@ -34,6 +36,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          registry="${REGISTRY%/}"
+          project_id="${PROJECT_ID#/}"
+          project_id="${project_id%/}"
+          repository="${REPOSITORY#/}"
+          repository="${repository%/}"
+
+          if [[ -z "$project_id" ]]; then
+            echo "GKE_PROJECT is empty in detect-context."
+            echo "An empty project id produces invalid tags like: ${registry}//${repository}/..."
+            echo "Make sure the 'sirit' environment exposes the GKE_PROJECT secret to this workflow."
+            exit 1
+          fi
+
+          if [[ -z "$registry" || -z "$repository" || -z "$IMAGE_BASE" ]]; then
+            echo "Registry, repository, and image base must be non-empty."
+            exit 1
+          fi
+
+          if [[ "$project_id" == */* ]]; then
+            echo "GKE_PROJECT must be only the GCP project id (no slashes). Got: $project_id"
+            exit 1
+          fi
+
           app_folder="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | awk -F/ '/^ex-[^/]+\// {print $1; exit}')"
           if [[ -z "$app_folder" ]]; then
             if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -Fxq "$WORKFLOW_FILE"; then
@@ -46,9 +72,9 @@ jobs:
           fi
 
           component_matrix="$(jq -cn \
-            --arg registry "$REGISTRY" \
-            --arg project_id "$PROJECT_ID" \
-            --arg repository "$REPOSITORY" \
+            --arg registry "$registry" \
+            --arg project_id "$project_id" \
+            --arg repository "$repository" \
             --arg image_base "$IMAGE_BASE" \
             --arg app_folder "$app_folder" \
             '{include: [
@@ -66,6 +92,12 @@ jobs:
               }
             ]}')"
 
+          if echo "$component_matrix" | jq -e '.include[].image_tag | contains("//")' >/dev/null; then
+            echo "Generated image tag contains a double slash, refusing to continue."
+            echo "$component_matrix" | jq -r '.include[].image_tag'
+            exit 1
+          fi
+
           echo "app_folder=$app_folder" >> "$GITHUB_OUTPUT"
           echo "component_matrix=$component_matrix" >> "$GITHUB_OUTPUT"
 
@@ -73,6 +105,8 @@ jobs:
     name: Build and Push (${{ matrix.component }})
     runs-on: ubuntu-latest
     environment: sirit
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
     needs: detect-context
     strategy:
       fail-fast: false
@@ -123,6 +157,8 @@ jobs:
     name: Deploy (${{ matrix.component }})
     runs-on: ubuntu-latest
     environment: sirit
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
     needs:
       - build-and-push
       - detect-context
