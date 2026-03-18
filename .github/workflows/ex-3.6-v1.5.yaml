@@ -25,6 +25,7 @@ jobs:
     name: Detect Build Context
     runs-on: ubuntu-latest
     environment: sirit
+    if: github.event_name == 'push'
     env:
       PROJECT_ID: ${{ secrets.GKE_PROJECT }}
     outputs:
