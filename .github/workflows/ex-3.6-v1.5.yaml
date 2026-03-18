@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "ex-3.6-v1.5/**"
+      - ".github/workflows/ex-3.6-v1.5.yaml"
 
 env:
   PROJECT_ID: ${{ secrets.GKE_PROJECT }}
