@@ -31,6 +31,8 @@ jobs:
     outputs:
       app_folder: ${{ steps.detect.outputs.app_folder }}
       component_matrix: ${{ steps.detect.outputs.component_matrix }}
+      target_namespace: ${{ steps.detect.outputs.target_namespace }}
+      image_tag_suffix: ${{ steps.detect.outputs.image_tag_suffix }}
 
     steps:
       - name: Checkout
@@ -78,6 +80,14 @@ jobs:
             fi
           fi
 
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            target_namespace="devops"
+          else
+            target_namespace="${GITHUB_REF_NAME}"
+          fi
+
+          image_tag_suffix="${app_folder}-${target_namespace}-${GITHUB_SHA::12}"
+
           component_matrix="$(jq -cn \
             --arg image_base "$IMAGE_BASE" \
             '{include: [
@@ -95,6 +105,8 @@ jobs:
 
           echo "app_folder=$app_folder" >> "$GITHUB_OUTPUT"
           echo "component_matrix=$component_matrix" >> "$GITHUB_OUTPUT"
+          echo "target_namespace=$target_namespace" >> "$GITHUB_OUTPUT"
+          echo "image_tag_suffix=$image_tag_suffix" >> "$GITHUB_OUTPUT"
 
   build-and-push:
     name: Build and Push (${{ matrix.component }})
@@ -145,7 +157,7 @@ jobs:
         run: |
           set -euo pipefail
           app_folder="${{ needs.detect-context.outputs.app_folder }}"
-          image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-${{ matrix.component }}:${app_folder}"
+          image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-${{ matrix.component }}:${{ needs.detect-context.outputs.image_tag_suffix }}"
 
           if [[ "$image_tag" == *"//"* ]]; then
             echo "Generated image tag contains a double slash: $image_tag"
@@ -206,9 +218,9 @@ jobs:
         shell: bash
         run: |-
           set -euo pipefail
-          app_folder="${{ needs.detect-context.outputs.app_folder }}"
-          backend_image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-backend:${app_folder}"
-          frontend_image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-frontend:${app_folder}"
+          target_namespace="${{ needs.detect-context.outputs.target_namespace }}"
+          backend_image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-backend:${{ needs.detect-context.outputs.image_tag_suffix }}"
+          frontend_image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-frontend:${{ needs.detect-context.outputs.image_tag_suffix }}"
 
           if [[ "$backend_image_tag" == *"//"* || "$frontend_image_tag" == *"//"* ]]; then
             echo "Generated image tag contains a double slash."
@@ -221,12 +233,14 @@ jobs:
           gcloud artifacts docker images describe "$backend_image_tag"
           gcloud artifacts docker images describe "$frontend_image_tag"
 
+          sed -i "s/^  name: .*/  name: ${target_namespace}/" manifests/namespace.yaml
+          kustomize edit set namespace "$target_namespace"
           kustomize edit set image "BACKEND_IMAGE=$backend_image_tag"
           kustomize edit set image "FRONTEND_IMAGE=$frontend_image_tag"
           kustomize build . | kubectl apply -f -
-          kubectl rollout status deployment todo-backend -n devops
-          kubectl rollout status deployment todo-frontend -n devops
-          kubectl get services -n devops -o wide
+          kubectl rollout status deployment todo-backend -n "$target_namespace"
+          kubectl rollout status deployment todo-frontend -n "$target_namespace"
+          kubectl get services -n "$target_namespace" -o wide
 
   teardown:
     name: Teardown application
@@ -258,9 +272,17 @@ jobs:
         uses: imranismail/setup-kustomize@v2.1.0
 
       - name: Delete all resources
-        working-directory: ./ex-3.6-v1.5
+        working-directory: ./ex-3.7-v1.6
         shell: bash
         run: |-
           set -euo pipefail
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            target_namespace="devops"
+          else
+            target_namespace="${GITHUB_REF_NAME}"
+          fi
+
+          sed -i "s/^  name: .*/  name: ${target_namespace}/" manifests/namespace.yaml
+          kustomize edit set namespace "$target_namespace"
           kustomize build . | kubectl delete --ignore-not-found=true -f -
           echo "All resources deleted."

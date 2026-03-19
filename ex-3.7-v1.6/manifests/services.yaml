@@ -2,7 +2,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: todo-backend
-  namespace: devops
 spec:
   ports:
     - port: 3001
@@ -14,7 +13,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: todo-frontend
-  namespace: devops
 spec:
   ports:
     - port: 3000
@@ -26,7 +24,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: devops
 spec:
   clusterIP: None
   ports:
