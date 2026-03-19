@@ -69,9 +69,16 @@ jobs:
             exit 1
           fi
 
-          app_folder="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | awk -F/ '/^ex-[^/]+\// {print $1; exit}')"
+          # Handle new branches where github.event.before is null
+          if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" || -z "${{ github.event.before }}" ]]; then
+            diff_base="origin/main"
+          else
+            diff_base="${{ github.event.before }}"
+          fi
+
+          app_folder="$(git diff --name-only "${diff_base}" "${{ github.sha }}" | awk -F/ '/^ex-[^/]+\// {print $1; exit}')"
           if [[ -z "$app_folder" ]]; then
-            if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -Fxq "$WORKFLOW_FILE"; then
+            if git diff --name-only "${diff_base}" "${{ github.sha }}" | grep -Fxq "$WORKFLOW_FILE"; then
               app_folder="$(basename "$WORKFLOW_FILE" .yaml)"
             else
               echo "No changed ex-* folder detected from push diff."
