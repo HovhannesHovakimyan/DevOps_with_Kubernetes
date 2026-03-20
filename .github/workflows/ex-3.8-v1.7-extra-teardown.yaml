@@ -53,9 +53,13 @@ jobs:
 
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${{ github.event.inputs.branch }}" ]]; then
             branch_name="${{ github.event.inputs.branch }}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            branch_name="${{ github.ref_name }}"
           else
             branch_name="${{ github.event.ref }}"
           fi
+
+          branch_name="${branch_name#refs/heads/}"
 
           if [[ -z "$branch_name" ]]; then
             echo "Could not determine branch name for teardown."
@@ -78,7 +82,7 @@ jobs:
           echo "Releasing global static IP: ${static_ip_name}"
 
           printf 'HOST=%s\nSTATIC_IP=%s\n' "${ingress_host}" "${static_ip_name}" > manifests/ingress-vars.env
-          sed -i "s/^  name: .*/  name: ${target_namespace}/" manifests/namespace.yaml
+          sed -i "s|^  name: .*|  name: ${target_namespace}|" manifests/namespace.yaml
           kustomize edit set namespace "$target_namespace"
           kustomize build . | kubectl delete --ignore-not-found=true -f -
           kubectl delete namespace "$target_namespace" --ignore-not-found=true --wait=false
