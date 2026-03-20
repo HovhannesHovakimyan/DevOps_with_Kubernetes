@@ -90,8 +90,19 @@ jobs:
             target_namespace="devops"
             ingress_host="www.${DOMAIN}"
           else
-            target_namespace="${GITHUB_REF_NAME}"
-            ingress_host="${GITHUB_REF_NAME}.${DOMAIN}"
+            branch_slug="$(printf '%s' "${GITHUB_REF_NAME}" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed -E 's|^refs/heads/||; s|[^a-z0-9]+|-|g; s|^-+||; s|-+$||; s|-{2,}|-|g')"
+            branch_slug="${branch_slug:0:55}"
+            branch_slug="${branch_slug%-}"
+
+            if [[ -z "$branch_slug" ]]; then
+              echo "Branch name '${GITHUB_REF_NAME}' cannot be converted into a valid namespace/DNS label."
+              exit 1
+            fi
+
+            target_namespace="$branch_slug"
+            ingress_host="${branch_slug}.${DOMAIN}"
           fi
 
           # Named global static IP: pre-create with:
