@@ -285,6 +285,94 @@ jobs:
           kubectl rollout status deployment todo-frontend -n "$target_namespace"
           kubectl get services -n "$target_namespace" -o wide
 
+      - name: Register domain in Cloud Domains (if not already registered)
+        # Requires the DOMAIN_CONTACT_DATA secret to be set in the 'sirit' environment.
+        # Format (YAML, stored as a single GitHub Actions secret):
+        #
+        #   allContacts:
+        #     email: 'you@example.com'
+        #     phoneNumber: '+11234567890'
+        #     postalAddress:
+        #       regionCode: 'US'
+        #       postalCode: '94043'
+        #       administrativeArea: 'CA'
+        #       locality: 'Mountain View'
+        #       addressLines: ['1600 Amphitheatre Pkwy']
+        #       recipients: ['Your Name']
+        #
+        # See: https://cloud.google.com/domains/docs/reference/rest/v1/projects.locations.registrations#Contact
+        env:
+          DOMAIN_CONTACT_DATA: ${{ secrets.DOMAIN_CONTACT_DATA }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Enable Cloud Domains API (idempotent).
+          gcloud services enable domains.googleapis.com --quiet
+
+          # Ensure Cloud DNS zone exists first (required as the link target for registration).
+          if ! gcloud dns managed-zones describe "${DNS_ZONE}" --quiet >/dev/null 2>&1; then
+            echo "Creating Cloud DNS zone ${DNS_ZONE} for ${DOMAIN}..."
+            gcloud dns managed-zones create "${DNS_ZONE}" \
+              --dns-name="${DOMAIN}." \
+              --description="Managed by GitHub Actions"
+            echo "Zone ${DNS_ZONE} created."
+          fi
+
+          if gcloud domains registrations describe "${DOMAIN}" --quiet >/dev/null 2>&1; then
+            echo "Domain ${DOMAIN} is already registered in this project."
+            reg_state="$(gcloud domains registrations describe "${DOMAIN}" \
+              --format='value(state)')"
+            echo "Registration state: ${reg_state}"
+
+            # Ensure it is delegated to our Cloud DNS zone.
+            # 'configure dns' is idempotent – safe to call even if already correct.
+            echo "Ensuring domain DNS is delegated to Cloud DNS zone ${DNS_ZONE}..."
+            gcloud domains registrations configure dns "${DOMAIN}" \
+              --cloud-dns-zone="${DNS_ZONE}" \
+              --quiet
+            echo "DNS delegation confirmed for ${DOMAIN} → ${DNS_ZONE}."
+          else
+            echo "Domain ${DOMAIN} is not registered in this project. Checking availability..."
+            avail="$(gcloud domains registrations get-register-parameters "${DOMAIN}" \
+              --format='value(availability)')"
+
+            if [[ "$avail" != "AVAILABLE" ]]; then
+              echo "ERROR: Domain ${DOMAIN} is not available for registration (status: ${avail})."
+              echo "It may already be registered under a different GCP project or external registrar."
+              echo "Please transfer or manually delegate its nameservers to the Cloud DNS zone."
+              exit 1
+            fi
+
+            # Resolve yearly price dynamically.
+            price_units="$(gcloud domains registrations get-register-parameters "${DOMAIN}" \
+              --format='value(yearlyPrice.units)')"
+            price_currency="$(gcloud domains registrations get-register-parameters "${DOMAIN}" \
+              --format='value(yearlyPrice.currencyCode)')"
+            yearly_price="${price_units}.00 ${price_currency}"
+            echo "Domain price: ${yearly_price}/year"
+
+            if [[ -z "${DOMAIN_CONTACT_DATA:-}" ]]; then
+              echo "ERROR: DOMAIN_CONTACT_DATA secret is empty."
+              echo "Add it to the 'sirit' environment in the format described in this step's comments."
+              exit 1
+            fi
+            echo "$DOMAIN_CONTACT_DATA" > /tmp/domain-contacts.yaml
+
+            echo "Registering ${DOMAIN} and linking to Cloud DNS zone ${DNS_ZONE}..."
+            gcloud domains registrations register "${DOMAIN}" \
+              --contact-data-from-file=/tmp/domain-contacts.yaml \
+              --contact-privacy=private-contact-data \
+              --cloud-dns-zone="${DNS_ZONE}" \
+              --yearly-price="${yearly_price}" \
+              --quiet
+            rm -f /tmp/domain-contacts.yaml
+
+            echo "Domain ${DOMAIN} registered and delegated to ${DNS_ZONE}."
+            echo "Authoritative nameservers:"
+            gcloud dns managed-zones describe "${DNS_ZONE}" --format='value(nameServers[])'
+          fi
+
       - name: Upsert Cloud DNS A record
         shell: bash
         run: |
@@ -292,15 +380,8 @@ jobs:
           ingress_host="${{ needs.detect-context.outputs.ingress_host }}"
           static_ip_name="${{ needs.detect-context.outputs.static_ip_name }}"
 
-          # Create managed zone on first run if it does not exist.
-          if ! gcloud dns managed-zones describe "${DNS_ZONE}" --quiet >/dev/null 2>&1; then
-            echo "Managed zone '${DNS_ZONE}' not found. Creating it for ${DOMAIN}."
-            gcloud dns managed-zones create "${DNS_ZONE}" \
-              --dns-name="${DOMAIN}." \
-              --description="Managed by GitHub Actions for branch-based ingress DNS"
-            echo "Created zone '${DNS_ZONE}'. Delegate these name servers at your registrar:"
-            gcloud dns managed-zones describe "${DNS_ZONE}" --format='value(nameServers[])'
-          fi
+          # Zone and domain delegation are handled by the preceding
+          # "Register domain in Cloud Domains" step. Nothing to do here.
 
           ingress_ip="$(gcloud compute addresses describe "${static_ip_name}" --global --format='value(address)')"
           echo "${static_ip_name} → ${ingress_ip}"
