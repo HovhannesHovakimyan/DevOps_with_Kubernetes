@@ -121,8 +121,9 @@ jobs:
             echo "Managed zone ${DNS_ZONE} not found. Skipping DNS cleanup."
           fi
 
-          # Delete the Cloud DNS zone and domain registration on main-branch teardown.
-          # Feature-branch teardowns leave the zone and registration intact.
+          # Delete the Cloud DNS zone on main-branch teardown.
+          # Feature-branch teardowns leave the zone intact.
+          # Note: Domain registration is managed manually, so we do not delete it here.
           if [[ "$branch_name" == "main" ]]; then
             if gcloud dns managed-zones describe "${DNS_ZONE}" --quiet >/dev/null 2>&1; then
               # Remove any residual record-sets (NS/SOA are deleted automatically with the zone).
@@ -137,13 +138,6 @@ jobs:
               fi
             else
               echo "Cloud DNS zone ${DNS_ZONE} not found. Skipping zone deletion."
-            fi
-
-            if gcloud domains registrations describe "${DOMAIN}" --quiet >/dev/null 2>&1; then
-              gcloud domains registrations delete "${DOMAIN}" --quiet
-              echo "Deleted domain registration: ${DOMAIN}"
-            else
-              echo "Domain registration for ${DOMAIN} not found. Skipping."
             fi
           fi
 

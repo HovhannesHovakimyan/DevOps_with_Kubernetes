@@ -285,14 +285,11 @@ jobs:
           kubectl rollout status deployment todo-frontend -n "$target_namespace"
           kubectl get services -n "$target_namespace" -o wide
 
-      - name: Register domain in Cloud Domains (if not already registered)
-        env:
-          DOMAIN_CONTACT_DATA: ${{ secrets.DOMAIN_CONTACT_DATA }}
+      - name: Ensure Cloud DNS zone exists
         shell: bash
         run: |
           set -euo pipefail
 
-          # Ensure Cloud DNS zone exists first (required as the link target for registration).
           if ! gcloud dns managed-zones describe "${DNS_ZONE}" --quiet >/dev/null 2>&1; then
             echo "Creating Cloud DNS zone ${DNS_ZONE} for ${DOMAIN}..."
             gcloud dns managed-zones create "${DNS_ZONE}" \
@@ -303,43 +300,9 @@ jobs:
             echo "Cloud DNS zone ${DNS_ZONE} already exists."
           fi
 
-          if gcloud domains registrations describe "${DOMAIN}" --quiet >/dev/null 2>&1; then
-            echo "Domain ${DOMAIN} is already registered in this project."
-            reg_state="$(gcloud domains registrations describe "${DOMAIN}" \
-              --format='value(state)')"
-            echo "Registration state: ${reg_state}"
-
-            # Ensure it is delegated to our Cloud DNS zone.
-            # 'configure dns' is idempotent – safe to call even if already correct.
-            echo "Ensuring domain DNS is delegated to Cloud DNS zone ${DNS_ZONE}..."
-            gcloud domains registrations configure dns "${DOMAIN}" \
-              --cloud-dns-zone="${DNS_ZONE}" \
-              --quiet
-            echo "DNS delegation confirmed for ${DOMAIN} → ${DNS_ZONE}."
-          else
-            echo "Domain ${DOMAIN} is not registered in this project. Registering..."
-
-            if [[ -z "${DOMAIN_CONTACT_DATA:-}" ]]; then
-              echo "ERROR: DOMAIN_CONTACT_DATA secret is empty."
-              echo "Add it to the 'sirit' environment with domain contact details in YAML format."
-              exit 1
-            fi
-            echo "$DOMAIN_CONTACT_DATA" > /tmp/domain-contacts.yaml
-
-            echo "Registering ${DOMAIN} and linking to Cloud DNS zone ${DNS_ZONE}..."
-            gcloud domains registrations register "${DOMAIN}" \
-              --contact-data-from-file=/tmp/domain-contacts.yaml \
-              --contact-privacy=redacted-contact-data \
-              --cloud-dns-zone="${DNS_ZONE}" \
-              --yearly-price="14.00 USD" \
-              --notices=hsts-preloaded \
-              --quiet
-            rm -f /tmp/domain-contacts.yaml
-
-            echo "Domain ${DOMAIN} registered and delegated to ${DNS_ZONE}."
-            echo "Authoritative nameservers:"
-            gcloud dns managed-zones describe "${DNS_ZONE}" --format='value(nameServers[])'
-          fi
+          echo "Authoritative nameservers for ${DNS_ZONE}:"
+          gcloud dns managed-zones describe "${DNS_ZONE}" --format='value(nameServers[])'
+          echo "NOTE: Domain registration is managed manually. Ensure your registrar delegates ${DOMAIN} to the nameservers above."
 
       - name: Upsert Cloud DNS A record
         shell: bash
