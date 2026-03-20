@@ -276,6 +276,16 @@ jobs:
           ingress_host="${{ needs.detect-context.outputs.ingress_host }}"
           static_ip_name="${{ needs.detect-context.outputs.static_ip_name }}"
 
+          # Create managed zone on first run if it does not exist.
+          if ! gcloud dns managed-zones describe "${DNS_ZONE}" --quiet >/dev/null 2>&1; then
+            echo "Managed zone '${DNS_ZONE}' not found. Creating it for ${DOMAIN}."
+            gcloud dns managed-zones create "${DNS_ZONE}" \
+              --dns-name="${DOMAIN}." \
+              --description="Managed by GitHub Actions for branch-based ingress DNS"
+            echo "Created zone '${DNS_ZONE}'. Delegate these name servers at your registrar:"
+            gcloud dns managed-zones describe "${DNS_ZONE}" --format='value(nameServers[])'
+          fi
+
           ingress_ip="$(gcloud compute addresses describe "${static_ip_name}" --global --format='value(address)')"
           echo "${static_ip_name} → ${ingress_ip}"
 

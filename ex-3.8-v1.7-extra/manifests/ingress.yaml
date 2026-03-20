@@ -3,9 +3,9 @@ kind: Ingress
 metadata:
   name: todo-ingress
   annotations:
-    kubernetes.io/ingress.class: gce
-    # Added at deploy time via a kustomize JSON 6902 patch.
+    # Added at deploy time via kustomize replacements.
 spec:
+  ingressClassName: gce
   rules:
     - http:
         paths:
