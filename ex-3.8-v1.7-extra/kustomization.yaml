@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: devops
+resources:
+- manifests/config-maps.yaml
+- manifests/deployments.yaml
+- manifests/ingress.yaml
+- manifests/namespace.yaml
+- manifests/pvc.yaml
+- manifests/secrets.yaml
+- manifests/services.yaml
+- manifests/statefulSets.yaml
+configMapGenerator:
+- name: ingress-runtime-vars
+  envs:
+  - manifests/ingress-vars.env
+generatorOptions:
+  disableNameSuffixHash: true
+replacements:
+- source:
+    kind: ConfigMap
+    name: ingress-runtime-vars
+    fieldPath: data.HOST
+  targets:
+  - select:
+      kind: Ingress
+      name: todo-ingress
+    fieldPaths:
+    - spec.rules.0.host
+    options:
+      create: true
+- source:
+    kind: ConfigMap
+    name: ingress-runtime-vars
+    fieldPath: data.STATIC_IP
+  targets:
+  - select:
+      kind: Ingress
+      name: todo-ingress
+    fieldPaths:
+    - metadata.annotations.[kubernetes.io/ingress.global-static-ip-name]
+    options:
+      create: true
+images:
+- name: BACKEND_IMAGE
+  newName: hovhanneshovakimyan/k8sproject
+  newTag: ex-3.6-v1.5-backend-multiarch
+- name: FRONTEND_IMAGE
+  newName: hovhanneshovakimyan/k8sproject
+  newTag: ex-3.6-v1.5-frontend-multiarch
