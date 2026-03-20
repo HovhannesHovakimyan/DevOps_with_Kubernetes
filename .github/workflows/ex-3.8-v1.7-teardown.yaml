@@ -1,0 +1,72 @@
+name: Teardown application on branch delete
+
+on:
+  delete:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch name to teardown (optional for manual runs)"
+        required: false
+        default: ""
+
+env:
+  GKE_CLUSTER: dwk-cluster
+  GKE_ZONE: me-west1
+
+jobs:
+  teardown:
+    name: Teardown namespace resources
+    runs-on: ubuntu-latest
+    environment: sirit
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+    if: github.event_name == 'workflow_dispatch' || github.event.ref_type == 'branch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v3
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          project_id: ${{ env.PROJECT_ID }}
+          location: ${{ env.GKE_ZONE }}
+
+      - name: Set up Kustomize
+        uses: imranismail/setup-kustomize@v2.1.0
+
+      - name: Delete all resources for deleted branch
+        working-directory: ./ex-3.8-v1.7
+        shell: bash
+        run: |-
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${{ github.event.inputs.branch }}" ]]; then
+            branch_name="${{ github.event.inputs.branch }}"
+          else
+            branch_name="${{ github.event.ref }}"
+          fi
+
+          if [[ -z "$branch_name" ]]; then
+            echo "Could not determine branch name for teardown."
+            exit 1
+          fi
+
+          if [[ "$branch_name" == "main" ]]; then
+            target_namespace="devops"
+          else
+            target_namespace="$branch_name"
+          fi
+
+          sed -i "s/^  name: .*/  name: ${target_namespace}/" manifests/namespace.yaml
+          kustomize edit set namespace "$target_namespace"
+          kustomize build . | kubectl delete --ignore-not-found=true -f -
+          echo "All resources deleted for namespace: $target_namespace"
