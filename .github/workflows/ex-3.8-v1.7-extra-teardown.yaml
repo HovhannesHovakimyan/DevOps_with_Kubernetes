@@ -140,7 +140,7 @@ jobs:
             fi
 
             if gcloud domains registrations describe "${DOMAIN}" --quiet >/dev/null 2>&1; then
-              gcloud domains registrations delete "${DOMAIN}" --location=global --quiet
+              gcloud domains registrations delete "${DOMAIN}" --quiet
               echo "Deleted domain registration: ${DOMAIN}"
             else
               echo "Domain registration for ${DOMAIN} not found. Skipping."
