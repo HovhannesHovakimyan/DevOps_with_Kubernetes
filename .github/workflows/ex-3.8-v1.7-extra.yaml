@@ -307,8 +307,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Enable Cloud Domains API (idempotent).
-          gcloud services enable domains.googleapis.com --quiet
+          # domains.googleapis.com must be pre-enabled by a project owner/editor.
+          # Enable it once with: gcloud services enable domains.googleapis.com --project=PROJECT_ID
+          # The github-actions SA does not have serviceusage.services.enable permission.
+          if ! gcloud services list --enabled --filter="name:domains.googleapis.com" --format="value(name)" | grep -q domains.googleapis.com; then
+            echo "ERROR: domains.googleapis.com is not enabled. Enable it manually with:"
+            echo "  gcloud services enable domains.googleapis.com --project=${PROJECT_ID}"
+            exit 1
+          fi
 
           # Ensure Cloud DNS zone exists first (required as the link target for registration).
           if ! gcloud dns managed-zones describe "${DNS_ZONE}" --quiet >/dev/null 2>&1; then
