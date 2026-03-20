@@ -1,0 +1,10 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: todo-managed-cert
+spec:
+  domains:
+    # domain 0 (www) and domain 1 (apex) are set at deploy time
+    # via kustomize replacements.
+    - placeholder-www.example.com
+    - placeholder-apex.example.com

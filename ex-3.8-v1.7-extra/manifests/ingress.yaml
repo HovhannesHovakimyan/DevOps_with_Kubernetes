@@ -3,10 +3,31 @@ kind: Ingress
 metadata:
   name: todo-ingress
   annotations:
-    # Added at deploy time via kustomize replacements.
+    # kubernetes.io/ingress.global-static-ip-name and
+    # networking.gke.io/managed-certificates are added at
+    # deploy time via kustomize replacements.
+    networking.gke.io/managed-certificates: todo-managed-cert
 spec:
   ingressClassName: gce
   rules:
+    # Rule 0: www host – set by kustomize replacement (HOST)
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: todo-frontend
+                port:
+                  number: 3000
+          - path: /todos
+            pathType: Prefix
+            backend:
+              service:
+                name: todo-backend
+                port:
+                  number: 3001
+    # Rule 1: apex host – set by kustomize replacement (APEX_HOST)
     - http:
         paths:
           - path: /

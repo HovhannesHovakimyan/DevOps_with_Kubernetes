@@ -5,6 +5,7 @@ resources:
 - manifests/config-maps.yaml
 - manifests/deployments.yaml
 - manifests/ingress.yaml
+- manifests/managed-certificate.yaml
 - manifests/namespace.yaml
 - manifests/pvc.yaml
 - manifests/secrets.yaml
@@ -27,6 +28,32 @@ replacements:
       name: todo-ingress
     fieldPaths:
     - spec.rules.0.host
+    options:
+      create: true
+  - select:
+      kind: ManagedCertificate
+      name: todo-managed-cert
+    fieldPaths:
+    - spec.domains.0
+    options:
+      create: true
+- source:
+    kind: ConfigMap
+    name: ingress-runtime-vars
+    fieldPath: data.APEX_HOST
+  targets:
+  - select:
+      kind: Ingress
+      name: todo-ingress
+    fieldPaths:
+    - spec.rules.1.host
+    options:
+      create: true
+  - select:
+      kind: ManagedCertificate
+      name: todo-managed-cert
+    fieldPaths:
+    - spec.domains.1
     options:
       create: true
 - source:

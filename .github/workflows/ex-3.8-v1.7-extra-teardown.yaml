@@ -69,6 +69,7 @@ jobs:
           if [[ "$branch_name" == "main" ]]; then
             target_namespace="devops"
             ingress_host="www.${DOMAIN}"
+            apex_host="${DOMAIN}"
           else
             branch_slug="$(printf '%s' "${branch_name}" \
               | tr '[:upper:]' '[:lower:]' \
@@ -83,6 +84,7 @@ jobs:
 
             target_namespace="$branch_slug"
             ingress_host="${branch_slug}.${DOMAIN}"
+            apex_host="${ingress_host}"
           fi
 
           static_ip_name="todo-${target_namespace}-ip"
@@ -92,20 +94,28 @@ jobs:
           echo "Removing DNS record: ${fqdn}"
           echo "Releasing global static IP: ${static_ip_name}"
 
-          printf 'HOST=%s\nSTATIC_IP=%s\n' "${ingress_host}" "${static_ip_name}" > manifests/ingress-vars.env
+          printf 'HOST=%s\nSTATIC_IP=%s\nAPEX_HOST=%s\n' "${ingress_host}" "${static_ip_name}" "${apex_host}" > manifests/ingress-vars.env
           sed -i "s|^  name: .*|  name: ${target_namespace}|" manifests/namespace.yaml
           kustomize edit set namespace "$target_namespace"
           kustomize build . | kubectl delete --ignore-not-found=true -f -
           kubectl delete namespace "$target_namespace" --ignore-not-found=true --wait=false
 
-          if gcloud dns managed-zones describe "${DNS_ZONE}" --quiet >/dev/null 2>&1; then
-            if gcloud dns record-sets describe "${fqdn}" --zone="${DNS_ZONE}" --type=A --quiet >/dev/null 2>&1; then
-              gcloud dns record-sets delete "${fqdn}" \
-                --zone="${DNS_ZONE}" \
-                --type=A \
-                --quiet
+          delete_dns_record() {
+            local host="$1"
+            local f="${host}."
+            if gcloud dns record-sets describe "${f}" --zone="${DNS_ZONE}" --type=A --quiet >/dev/null 2>&1; then
+              gcloud dns record-sets delete "${f}" \
+                --zone="${DNS_ZONE}" --type=A --quiet
+              echo "Deleted DNS A record: ${host}"
             else
-              echo "DNS A record ${fqdn} not found in zone ${DNS_ZONE}."
+              echo "DNS A record ${f} not found in zone ${DNS_ZONE}."
+            fi
+          }
+
+          if gcloud dns managed-zones describe "${DNS_ZONE}" --quiet >/dev/null 2>&1; then
+            delete_dns_record "${ingress_host}"
+            if [[ "${apex_host}" != "${ingress_host}" ]]; then
+              delete_dns_record "${apex_host}"
             fi
           else
             echo "Managed zone ${DNS_ZONE} not found. Skipping DNS cleanup."

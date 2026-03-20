@@ -31,6 +31,7 @@ jobs:
       target_namespace: ${{ steps.detect.outputs.target_namespace }}
       image_tag_suffix: ${{ steps.detect.outputs.image_tag_suffix }}
       ingress_host: ${{ steps.detect.outputs.ingress_host }}
+      apex_host: ${{ steps.detect.outputs.apex_host }}
       static_ip_name: ${{ steps.detect.outputs.static_ip_name }}
 
     steps:
@@ -89,6 +90,7 @@ jobs:
           if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
             target_namespace="devops"
             ingress_host="www.${DOMAIN}"
+            apex_host="${DOMAIN}"
           else
             branch_slug="$(printf '%s' "${GITHUB_REF_NAME}" \
               | tr '[:upper:]' '[:lower:]' \
@@ -103,6 +105,7 @@ jobs:
 
             target_namespace="$branch_slug"
             ingress_host="${branch_slug}.${DOMAIN}"
+            apex_host="${ingress_host}"
           fi
 
           # Named global static IP: pre-create with:
@@ -112,6 +115,7 @@ jobs:
           image_tag_suffix="${app_folder}-${target_namespace}-${GITHUB_SHA::12}"
 
           echo "ingress_host=$ingress_host" >> "$GITHUB_OUTPUT"
+          echo "apex_host=$apex_host" >> "$GITHUB_OUTPUT"
           echo "static_ip_name=$static_ip_name" >> "$GITHUB_OUTPUT"
 
           component_matrix="$(jq -cn \
@@ -271,7 +275,8 @@ jobs:
           kustomize edit set namespace "$target_namespace"
 
           # Feed ingress runtime values to kustomize replacements.
-          printf 'HOST=%s\nSTATIC_IP=%s\n' "${ingress_host}" "${static_ip_name}" > manifests/ingress-vars.env
+          apex_host="${{ needs.detect-context.outputs.apex_host }}"
+          printf 'HOST=%s\nSTATIC_IP=%s\nAPEX_HOST=%s\n' "${ingress_host}" "${static_ip_name}" "${apex_host}" > manifests/ingress-vars.env
 
           kustomize edit set image "BACKEND_IMAGE=$backend_image_tag"
           kustomize edit set image "FRONTEND_IMAGE=$frontend_image_tag"
@@ -300,12 +305,23 @@ jobs:
           ingress_ip="$(gcloud compute addresses describe "${static_ip_name}" --global --format='value(address)')"
           echo "${static_ip_name} → ${ingress_ip}"
 
-          fqdn="${ingress_host}."
-          if gcloud dns record-sets describe "${fqdn}" --zone="${DNS_ZONE}" --type=A --quiet 2>/dev/null; then
-            gcloud dns record-sets update "${fqdn}" \
-              --zone="${DNS_ZONE}" --type=A --ttl=300 --rrdatas="${ingress_ip}"
-          else
-            gcloud dns record-sets create "${fqdn}" \
-              --zone="${DNS_ZONE}" --type=A --ttl=300 --rrdatas="${ingress_ip}"
+          upsert_dns_record() {
+            local host="$1" ip="$2"
+            local fqdn="${host}."
+            if gcloud dns record-sets describe "${fqdn}" --zone="${DNS_ZONE}" --type=A --quiet 2>/dev/null; then
+              gcloud dns record-sets update "${fqdn}" \
+                --zone="${DNS_ZONE}" --type=A --ttl=300 --rrdatas="${ip}"
+            else
+              gcloud dns record-sets create "${fqdn}" \
+                --zone="${DNS_ZONE}" --type=A --ttl=300 --rrdatas="${ip}"
+            fi
+            echo "DNS A record set: ${host} → ${ip}"
+          }
+
+          upsert_dns_record "${ingress_host}" "${ingress_ip}"
+
+          # Also point the apex domain at the same IP (only differs on main).
+          apex_host="${{ needs.detect-context.outputs.apex_host }}"
+          if [[ "${apex_host}" != "${ingress_host}" ]]; then
+            upsert_dns_record "${apex_host}" "${ingress_ip}"
           fi
-          echo "DNS A record set: ${ingress_host} → ${ingress_ip}"
