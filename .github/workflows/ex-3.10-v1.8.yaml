@@ -1,0 +1,244 @@
+name: Release application
+
+on:
+  push:
+    paths:
+      - "ex-3.10-1.8/**"
+      - ".github/workflows/ex-3.10-1.8.yaml"
+
+env:
+  GKE_CLUSTER: dwk-cluster
+  GKE_ZONE: me-west1
+  REGISTRY: me-west1-docker.pkg.dev
+  REPOSITORY: my-repository
+  IMAGE_BASE: k8sproject
+  WORKFLOW_FILE: .github/workflows/ex-3.10-1.8.yaml
+
+jobs:
+  detect-context:
+    name: Detect Build Context
+    runs-on: ubuntu-latest
+    environment: sirit
+    if: github.event_name == 'push'
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+    outputs:
+      app_folder: ${{ steps.detect.outputs.app_folder }}
+      component_matrix: ${{ steps.detect.outputs.component_matrix }}
+      target_namespace: ${{ steps.detect.outputs.target_namespace }}
+      image_tag_suffix: ${{ steps.detect.outputs.image_tag_suffix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect app folder from changed files
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          registry="${REGISTRY%/}"
+          project_id="${PROJECT_ID#/}"
+          project_id="${project_id%/}"
+          repository="${REPOSITORY#/}"
+          repository="${repository%/}"
+
+          if [[ -z "$project_id" ]]; then
+            echo "GKE_PROJECT is empty in detect-context."
+            echo "An empty project id produces invalid tags like: ${registry}//${repository}/..."
+            echo "Make sure the 'sirit' environment exposes the GKE_PROJECT secret to this workflow."
+            exit 1
+          fi
+
+          if [[ -z "$registry" || -z "$repository" || -z "$IMAGE_BASE" ]]; then
+            echo "Registry, repository, and image base must be non-empty."
+            exit 1
+          fi
+
+          if [[ "$project_id" == */* ]]; then
+            echo "GKE_PROJECT must be only the GCP project id (no slashes). Got: $project_id"
+            exit 1
+          fi
+
+          # Handle new branches where github.event.before is null
+          if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" || -z "${{ github.event.before }}" ]]; then
+            diff_base="origin/main"
+          else
+            diff_base="${{ github.event.before }}"
+          fi
+
+          app_folder="$(git diff --name-only "${diff_base}" "${{ github.sha }}" | awk -F/ '/^ex-[^/]+\// {print $1; exit}')"
+          if [[ -z "$app_folder" ]]; then
+            if git diff --name-only "${diff_base}" "${{ github.sha }}" | grep -Fxq "$WORKFLOW_FILE"; then
+              app_folder="$(basename "$WORKFLOW_FILE" .yaml)"
+            else
+              echo "No changed ex-* folder detected from push diff."
+              echo "Ensure this workflow is triggered by changes under an ex-* directory or by updating $WORKFLOW_FILE."
+              exit 1
+            fi
+          fi
+
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            target_namespace="devops"
+          else
+            target_namespace="${GITHUB_REF_NAME}"
+          fi
+
+          image_tag_suffix="${app_folder}-${target_namespace}-${GITHUB_SHA::12}"
+
+          component_matrix="$(jq -cn \
+            --arg image_base "$IMAGE_BASE" \
+            '{include: [
+              {
+                component: "backend",
+                image_name: ($image_base + "-backend"),
+                kustomize_image_key: "BACKEND_IMAGE"
+              },
+              {
+                component: "frontend",
+                image_name: ($image_base + "-frontend"),
+                kustomize_image_key: "FRONTEND_IMAGE"
+              }
+            ]}')"
+
+          echo "app_folder=$app_folder" >> "$GITHUB_OUTPUT"
+          echo "component_matrix=$component_matrix" >> "$GITHUB_OUTPUT"
+          echo "target_namespace=$target_namespace" >> "$GITHUB_OUTPUT"
+          echo "image_tag_suffix=$image_tag_suffix" >> "$GITHUB_OUTPUT"
+
+  build-and-push:
+    name: Build and Push (${{ matrix.component }})
+    runs-on: ubuntu-latest
+    environment: sirit
+    if: github.event_name == 'push'
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+    needs: detect-context
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-context.outputs.component_matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Debug GKE_SA_KEY length
+        shell: bash
+        run: |
+          echo "Length of GKE_SA_KEY: $(echo '${{ secrets.GKE_SA_KEY }}' | wc -c)"
+
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Use gcloud CLI
+        run: gcloud info
+
+      - name: Verify active identity
+        run: gcloud auth list --filter=status:ACTIVE --format="value(account)"
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud --quiet auth configure-docker ${{ env.REGISTRY }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v3
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          project_id: ${{ env.PROJECT_ID }}
+          location: ${{ env.GKE_ZONE }}
+
+      - name: Build and Publish Image
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_folder="${{ needs.detect-context.outputs.app_folder }}"
+          image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-${{ matrix.component }}:${{ needs.detect-context.outputs.image_tag_suffix }}"
+
+          if [[ "$image_tag" == *"//"* ]]; then
+            echo "Generated image tag contains a double slash: $image_tag"
+            exit 1
+          fi
+
+          docker build --tag "$image_tag" "./$app_folder/${{ matrix.component }}"
+          docker push "$image_tag"
+
+  deploy:
+    name: Deploy application
+    runs-on: ubuntu-latest
+    environment: sirit
+    if: github.event_name == 'push'
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+    needs:
+      - build-and-push
+      - detect-context
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Debug GKE_SA_KEY length
+        shell: bash
+        run: |
+          echo "Length of GKE_SA_KEY: $(echo '${{ secrets.GKE_SA_KEY }}' | wc -c)"
+
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Use gcloud CLI
+        run: gcloud info
+
+      - name: Verify active identity
+        run: gcloud auth list --filter=status:ACTIVE --format="value(account)"
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud --quiet auth configure-docker ${{ env.REGISTRY }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v3
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          project_id: ${{ env.PROJECT_ID }}
+          location: ${{ env.GKE_ZONE }}
+
+      - name: Set up Kustomize
+        uses: imranismail/setup-kustomize@v2.1.0
+
+      - name: Deploy backend and frontend
+        working-directory: ./${{ needs.detect-context.outputs.app_folder }}
+        shell: bash
+        run: |-
+          set -euo pipefail
+          target_namespace="${{ needs.detect-context.outputs.target_namespace }}"
+          backend_image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-backend:${{ needs.detect-context.outputs.image_tag_suffix }}"
+          frontend_image_tag="${REGISTRY%/}/${PROJECT_ID}/${REPOSITORY}/${IMAGE_BASE}-frontend:${{ needs.detect-context.outputs.image_tag_suffix }}"
+
+          if [[ "$backend_image_tag" == *"//"* || "$frontend_image_tag" == *"//"* ]]; then
+            echo "Generated image tag contains a double slash."
+            echo "Backend tag: $backend_image_tag"
+            echo "Frontend tag: $frontend_image_tag"
+            exit 1
+          fi
+
+          # Fail fast if either image was not pushed successfully.
+          gcloud artifacts docker images describe "$backend_image_tag"
+          gcloud artifacts docker images describe "$frontend_image_tag"
+
+          sed -i "s/^  name: .*/  name: ${target_namespace}/" manifests/namespace.yaml
+          kustomize edit set namespace "$target_namespace"
+          kustomize edit set image "BACKEND_IMAGE=$backend_image_tag"
+          kustomize edit set image "FRONTEND_IMAGE=$frontend_image_tag"
+          kustomize build . | kubectl apply -f -
+          kubectl rollout status deployment todo-backend -n "$target_namespace"
+          kubectl rollout status deployment todo-frontend -n "$target_namespace"
+          kubectl get services -n "$target_namespace" -o wide
