@@ -3,8 +3,8 @@ name: Release application
 on:
   push:
     paths:
-      - "ex-3.10-1.8/**"
-      - ".github/workflows/ex-3.10-1.8.yaml"
+      - "ex-3.10-v1.8/**"
+      - ".github/workflows/ex-3.10-v1.8.yaml"
 
 env:
   GKE_CLUSTER: dwk-cluster
@@ -12,7 +12,7 @@ env:
   REGISTRY: me-west1-docker.pkg.dev
   REPOSITORY: my-repository
   IMAGE_BASE: k8sproject
-  WORKFLOW_FILE: .github/workflows/ex-3.10-1.8.yaml
+  WORKFLOW_FILE: .github/workflows/ex-3.10-v1.8.yaml
 
 jobs:
   detect-context:
