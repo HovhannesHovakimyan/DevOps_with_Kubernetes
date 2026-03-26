@@ -48,6 +48,8 @@ spec:
                 - |
                   set -e
 
+                  apk add --no-cache postgresql-client > /dev/null 2>&1
+
                   BACKUP_DATE=$(date +%Y-%m-%d_%H-%M-%S)
                   BACKUP_FILE="postgres-backup-${BACKUP_DATE}.sql"
 
