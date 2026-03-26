@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: devops
+resources:
+- manifests/config-maps.yaml
+- manifests/backup-rbac.yaml
+- manifests/cronjob-db-backup.yaml
+- manifests/deployments.yaml
+- manifests/ingress.yaml
+- manifests/namespace.yaml
+- manifests/pvc.yaml
+- manifests/secrets.yaml
+- manifests/services.yaml
+- manifests/statefulSets.yaml
+images:
+- name: BACKEND_IMAGE
+  newName: hovhanneshovakimyan/k8sproject
+  newTag: ex-3.6-v1.5-backend-multiarch
+- name: FRONTEND_IMAGE
+  newName: hovhanneshovakimyan/k8sproject
+  newTag: ex-3.6-v1.5-frontend-multiarch
