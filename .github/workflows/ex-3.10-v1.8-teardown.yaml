@@ -52,7 +52,7 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${{ github.event.inputs.branch }}" ]]; then
             branch_name="${{ github.event.inputs.branch }}"
           else
-            branch_name="${{ github.event.ref }}"
+            branch_name="${{ github.event.ref_name }}"
           fi
 
           if [[ -z "$branch_name" ]]; then
