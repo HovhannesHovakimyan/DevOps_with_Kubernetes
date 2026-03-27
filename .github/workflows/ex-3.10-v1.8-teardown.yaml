@@ -66,7 +66,7 @@ jobs:
             target_namespace="$branch_name"
           fi
 
-          sed -i "s/^  name: .*/  name: ${target_namespace}/" manifests/namespace.yaml
+          sed -i "s#^  name: .*#  name: ${target_namespace}#" manifests/namespace.yaml
           kustomize edit set namespace "$target_namespace"
           kustomize build . | kubectl delete --ignore-not-found=true -f -
           echo "All resources deleted for namespace: $target_namespace"
