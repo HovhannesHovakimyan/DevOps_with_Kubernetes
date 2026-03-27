@@ -46,13 +46,17 @@ jobs:
       - name: Delete all resources for deleted branch
         working-directory: ./ex-3.10-v1.8
         shell: bash
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_REF_NAME: ${{ github.event.ref_name }}
+          GITHUB_EVENT_INPUTS_BRANCH: ${{ github.event.inputs.branch }}
         run: |-
           set -euo pipefail
 
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${{ github.event.inputs.branch }}" ]]; then
-            branch_name="${{ github.event.inputs.branch }}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${GITHUB_EVENT_INPUTS_BRANCH}" ]]; then
+            branch_name="${GITHUB_EVENT_INPUTS_BRANCH}"
           else
-            branch_name="${{ github.event.ref_name }}"
+            branch_name="${GITHUB_EVENT_REF_NAME}"
           fi
 
           if [[ -z "$branch_name" ]]; then
